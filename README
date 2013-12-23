@@ -1,0 +1,66 @@
+############################################
+#
+#	CS 50 Final Project
+#	AMAZING Maze Solver Client
+#	Amith Ananthram
+#	Matt Knight
+#
+############################################
+
+Key Files:
+amazing.[h/c]
+mazefuncs.[h/c]
+messaging.[h/c]
+sharedmem.[h/c]
+AMStartup.sh
+amstartup2.c
+am_test.sh
+
+This package contains our submission for the AMAZING maze solver.  Our
+algorithm employs a local breadcrumb strategy for each avatar along with a
+shared wall tracker to allow large numbers of avatars to solve complex mazes
+with ease.  Our algorithm is also able to identify and block off dead ends to
+prevent other avatars from taking lengthy detours.  This scheme excels when
+there are many avatars present - since each bad move (into a wall or dead end)
+can only be made once then more avatars stand to benefit from the mistakes one
+avatar makes.
+
+The Solutions folder contains the necessary runs for the various project goals.
+
+Building:
+make clean
+make amazing
+make amstartup2
+
+Testing:
+./am_test.sh to perform input validation testing and functional testing for 1
+through 10 avatars and 0 through 9 difficulty.
+
+Running:
+./AMStartup.sh (-n -d -h)
+
+Known Issues:
+Shared memory is disabled on difficulties 8 and 9.  This is because it would 
+segfault once the maze grew to be larger than 40x40.  I believe that this is 
+the result of our kernel's shared memory access configuration.
+The system configuration for the IPC functions we are using (machine hogback,
+/proc/sys/kernel/shmmax) allows up to 33,554,432 bytes to be allocated as a 
+single piece of shared memory.  The system limit on total shared
+memory (/proc/sys/kernel/shmall) is capped at 2,097,152 bytes.  Both of these
+parameters should be sufficient to hold a 100 by 100 array of unsigned ints 
+(40,000 bytes), however gdb indicates that it segfaults in init_walls() at 
+row 46 and column 56 while initializing the wall matrix.  This happens for 
+difficulties 8 and 9.  The fact that it happens at the same place makes me 
+believe it is a memory allocation issue.
+To circumvent this issue we placed the init_mem() function within a
+conditional statement.  If the difficulty is less than 8 then it uses the
+shared wall matrix.  If difficulty is 8 or greater then it does not point
+wall_path at the shared memory segment and instead each avatar keeps a local
+wall matrix.  It is less efficient but it runs.
+When called by Avatar 0, free_mem() occasionally fails at shmctl() while trying
+to mark the shared memory segment for deletion.  When this error occurs it 
+happens after shmdt() has detached the process from the memory.  This works the
+vast majority of the time, so I do not think it is an issue with the sequencing
+there.  shmctl(...,IPC_RMID,...) does not even delete the memory immediately, 
+it marks it for deletion once all attached processes are done, which is more 
+evidence suggesting that that is not the problem.
